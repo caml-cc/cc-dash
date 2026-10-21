@@ -1,0 +1,159 @@
+# termdash configuration
+# ~/.config/termdash/config.toml
+#
+# Every value below is the built-in default, so deleting a line changes nothing.
+# Colours accept:  "cyan"  "#38bdf8"  "56,189,248"  "74" (256-colour index)
+#                  "default" or "" leaves it to the terminal.
+# Unknown keys are an error, so a typo is reported instead of ignored.
+
+[general]
+title = ""                  # blank = user@hostname
+os_name = ""                # blank = PRETTY_NAME from /etc/os-release
+default_mode = "once"       # what plain `termdash` does: "once" or "live"
+fps = 30                    # redraw cap in live mode
+packages_cache_secs = 3600  # how long the rpm count is reused
+quit_keys = true            # q or Esc leaves live mode
+
+[text]
+# Arabic, Hebrew and the other right-to-left scripts need their letters joined
+# and their words reordered before a terminal can show them. Terminals disagree
+# about how much of that they do themselves, and doing a job twice looks as
+# wrong as not doing it at all. Run
+#     termdash --debug-text "مرحبا بالعالم"
+# which prints all four options, see which one reads correctly in YOUR
+# terminal, and put its name here.
+#   "shape-and-reorder"  join the letters and reorder  (the default)
+#   "reorder-only"       reorder only, for a terminal that shapes Arabic itself
+#   "shape-only"         join only, for a terminal that reorders but not shapes
+#   "off"                send the text exactly as it arrived
+rtl = "shape-and-reorder"
+
+[layout]
+mode = "auto"               # "auto" = player on the right if the window is wide
+                            # enough, otherwise underneath. "side" / "stack" force it.
+left_width = 80             # columns of the specs panel
+player_width = 60           # columns of the player panel
+logo_gap = 2                # columns between the logo and the specs
+side_gap = 2                # columns between the two panels
+stack_gap = 1               # blank rows between the panels when stacked
+logo_width = 33
+logo_height = 15
+cover_top = 11              # rows into the player panel where the cover starts
+cover_max_height = 24
+clock_bar_width = 24
+cover_aspect = 0.0          # how many columns are as wide as one row is tall.
+                            # 0 asks the terminal for its character cell size,
+                            # which is what keeps album art square. Set it by
+                            # hand (try 2.0 to 2.4) only if the art looks
+                            # stretched or cropped down its sides.
+
+[info]
+# Which specs to show, in order. Remove any you do not care about.
+# Available: os host kernel board uptime packages shell resolution terminal
+#            cpu gpu memory swap disk loadavg battery wm de locale user
+rows = [
+  "os", "host", "kernel", "board", "uptime", "packages", "shell",
+  "resolution", "terminal", "cpu", "gpu", "memory", "disk",
+]
+underline_title = true
+
+# Rename any row, e.g.  board = "Mainboard"
+[info.labels]
+
+[clocks]
+show = true
+day_bar = true              # the bar that fills as the day passes
+show_12h = true
+# Add or remove as many clocks as you like. tz = "local" uses this machine.
+entries = [
+  { label = "LOCAL", tz = "local" },
+  { label = "TOKYO", tz = "Asia/Tokyo" },
+  { label = "NY", tz = "America/New_York" },
+]
+
+[timers]
+show = true
+birthday = "03-25"          # MM-DD, blank hides it
+born = "2000-01-01"         # YYYY-MM-DD, blank hides the days-alive counter
+show_new_year = true
+birthday_label = "BIRTHDAY"
+new_year_label = "NEW YEAR"
+alive_label = "DAYS ALIVE"
+# Any extra countdowns:  { label = "EXAM", date = "2027-01-12" }
+extra = []
+
+[player]
+show = true
+name = ""                   # blank = whichever MPRIS player is running,
+                            # or "spotify", "vlc", "firefox", "mpv" ...
+poll_ms = 250               # how often the player is asked for its state
+show_cover = true
+art_timeout_secs = 5        # seconds allowed for downloading remote cover art
+nothing_playing = "Nothing playing"
+progress_bar = true         # progress bar under the track line
+scroll = true               # in live mode, scroll artist/title/album past when
+                            # they are too long to fit their column
+scroll_speed = 3.0          # columns per second
+scroll_delay = 2.0          # seconds a new track is held still before scrolling
+scroll_gap = "   •   "      # shown between the end and the start as it goes round
+table_style = "unicode"     # lines between the track columns:
+                            #   "unicode"  Time │ Artist │ Title │ Album
+                            #   "ascii"    Time | Artist | Title | Album
+                            #   "none"     just blank columns (see column_gap)
+column_gap = 1              # with table_style = "none", how many blank columns
+                            # to keep between the track columns
+col_time = 7                # widths of the track line columns. The title takes
+col_artist = 16             # whatever is left over, so these three and the
+col_title = 25              # dividers always add up to player_width; col_title
+col_album = 12              # is only the width it starts from.
+
+[image]
+# "kitty" draws a real picture using the kitty graphics protocol
+# (kitty, Ghostty and WezTerm support it). The text modes are
+# "blocks" (half blocks, true colour), "braille" (2x4 dots) and "ascii".
+logo_mode = "kitty"
+cover_mode = "kitty"
+fit = "cover"               # "cover" crops to fill, "contain" fits the whole picture
+logo_path = ""              # blank = the first ~/.config/termdash/logo.* file
+fallback_cover = ""         # picture to show when nothing is playing
+saturation = 1.25
+gamma = 1.0                 # above 1 brightens the midtones
+contrast = 1.0              # auto-contrast, percent clipped each end, 0 = off
+sharpen = 50                # unsharp mask percent, 0 = off
+boost = 0.55                # braille/ascii: how much dim colours are brightened
+edges = 72.0                # ascii: edge strength that switches to / \ | - , 0 = off
+ramp = ""                   # ascii: your own characters, dark to bright
+logo_tint = ""              # one colour instead of full colour, e.g. "#38bdf8"
+cover_tint = ""
+dither = true               # braille: dither the dots
+cell_width_px = 10          # only used if the terminal does not report cell size
+cell_height_px = 20
+
+[audio]
+show = true
+cava_path = "cava"
+cava_config = ""            # blank = termdash writes cava.conf next to this file
+method = "pulse"            # PipeWire answers on the pulse interface; macOS uses cava's CoreAudio tap
+source = "auto"
+framerate = 60
+lower_cutoff_freq = 40
+higher_cutoff_freq = 12000
+noise_reduction = 60
+smooth = 0.35               # extra smoothing done by termdash, 0 = off
+bar_width = 0               # 0 = fit the player panel
+labels = ["Bass", "Mid", "Treble", "Volume"]
+
+[colors]
+title = "bright_cyan"
+label = "cyan"
+value = "default"
+separator = "gray"
+header = "bright_cyan"
+track = "default"
+bar_fill = "green"
+bar_warn = "red"
+bar_empty = "default"
+bracket = "default"
+bar_warn_at = 80            # percent at which a bar turns to bar_warn
+bar_fill_char = "|"
+bar_empty_char = " "

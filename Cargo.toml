@@ -1,0 +1,36 @@
+[package]
+name = "termdash"
+version = "4.3.0"
+edition = "2021"
+rust-version = "1.78"
+description = "Terminal dashboard: system specs, clocks and an MPRIS music player"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "0.9"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff", "ico"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10"
+unicode-width = "0.2"
+unicode-bidi = "0.3"
+ar-reshaper = "1"
+libc = "0.2"
+base64 = "0.22"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5", default-features = false, features = ["blocking-api", "async-io"] }
+
+# The fake MPRIS player needs D-Bus, which only the Linux build has.
+[[example]]
+name = "fake_player"
+required-features = ["fake-player"]
+
+[features]
+fake-player = []
