@@ -1,58 +1,102 @@
-# termdash 4.3
+# cc-dash
 
-A terminal dashboard: system specs and clocks on the left, an MPRIS music
-player with album art on the right. Rewritten in Rust from the earlier
-bash + Python version.
+Small Rust terminal dashboard: system specs and clocks on the left, a music player with album art and audio meters on the right. Runs on Linux and macOS. The binary is called `termdash`.
 
+## Install
+
+### Option 1: Install script (recommended)
+
+```bash
+git clone https://github.com/caml-cc/cc-dash.git
+cd cc-dash
+./install.sh
 ```
-./install.sh          # Ubuntu/Debian, Fedora or macOS; zsh, bash or fish
-termdash              # draw once
-termdash --live       # keep it updating, q or Ctrl+C to quit
+
+Works on Ubuntu/Debian, Fedora and macOS with zsh, bash or fish. It installs the build dependencies and `cava` (with apt, dnf or brew), builds the binary, copies it to `~/.local/bin`, and writes a starter config.
+
+The script takes a few environment switches:
+
+```bash
+SKIP_PACKAGES=1 ./install.sh # don't install anything with apt / dnf / brew
+PREFIX=~/.local ./install.sh # where the binary goes (default ~/.local)
+TERMDASH_AUTORUN=1 ./install.sh # draw termdash in every new terminal without asking (0 = never)
 ```
 
-## Platforms
+### Option 2: Build from source
 
-Linux (Ubuntu/Debian, Fedora, anything else that builds Rust) and macOS.
-Windows is not supported and the build stops with an error there.
+```bash
+cargo build --release
+```
+
+Then copy `target/release/termdash` somewhere on your `PATH`. Needs Rust 1.78 or newer. Windows is not supported.
+
+## Config
+
+The config lives at `$HOME/.config/termdash/config.toml`. If the file is missing, `termdash` writes one on first run with every setting set to its default and commented. A typo is reported with its line number instead of being ignored.
+
+```toml
+[layout]
+mode = "auto" # "auto" puts the player on the right if the window is wide enough, otherwise underneath. "side" / "stack" force it.
+
+[player]
+name = "" # blank = whichever MPRIS player is running, or "spotify", "vlc", "mpv" ...
+
+[clocks]
+entries = [
+  { label = "LOCAL", tz = "local" },
+  { label = "TOKYO", tz = "Asia/Tokyo" },
+]
+```
+
+The main sections:
+
+- `[info]` which specs to show and in what order, `[info.labels]` to rename any of them.
+- `[clocks]` as many clocks as you like.
+- `[timers]` birthday, new year, days alive, and your own countdowns in `extra`.
+- `[player]` player choice, track table style, scrolling.
+- `[image]` picture modes, fit, saturation, gamma, contrast, sharpening, tint.
+- `[audio]` the cava settings. `cava.conf` is regenerated when they change.
+- `[colors]` names, `#rrggbb`, `r,g,b` or a 256-colour index.
+
+`termdash --print-config` prints the full default config.
+
+## Usage
+
+```bash
+termdash # draws once (or whatever general.default_mode says)
+termdash --live # keeps updating, q, Esc or Ctrl+C to quit
+termdash --once # draws once and exits
+termdash -c ./other.toml # uses a different config file
+termdash --image blocks # overrides the picture mode for one run
+termdash --print-config # prints the default config
+termdash --config-path # prints where the config lives
+termdash --debug-text "مرحبا بالعالم" # shows how right-to-left text is shaped and reordered
+```
+
+### Platforms
 
 | | Linux | macOS |
 |---|---|---|
-| system facts | `/proc`, `/sys`, os-release | sysctl, Mach, CoreGraphics, `pmset` |
-| music player | any MPRIS player over D-Bus | Music and Spotify through `osascript` (polled once a second at most) |
-| audio meters | `cava` | `cava` 1.0+ (`brew install cava`; taps system audio directly on macOS 14.2+, you allow "System Audio Recording" once. Older macOS falls back to BlackHole) |
+| system specs | `/proc`, `/sys`, os-release | sysctl, Mach, CoreGraphics, `pmset` |
+| music player | any MPRIS player over D-Bus | Music and Spotify through `osascript` |
+| audio meters | `cava` | `cava` 1.0+, taps system audio on macOS 14.2+ (older versions fall back to BlackHole) |
 
-## What changed from the shell version
+On macOS you allow "System Audio Recording" once for the meters.
 
-| | bash + Python | Rust |
-|---|---|---|
-| one draw | ~250 ms | ~15 ms |
-| live mode, idle | a `playerctl` process every second | one D-Bus call, ~1.5% of a core |
-| redrawing | whole screen every tick | only the cells that changed |
-| pictures | ASCII only | real images on kitty, or three text modes |
-| settings | editing the script | `~/.config/termdash/config.toml` |
-| needs at runtime | python3-pillow, playerctl, pciutils, cava | glibc; cava only for the meters |
+### Pictures
 
-The old version shelled out constantly: `playerctl` once a second, `python3`
-on every track change, plus `dpkg-query`, `lspci`, `fastfetch` and a subshell
-per value. This one reads `/proc` and `/sys` directly, talks to MPRIS over
-D-Bus itself, and keeps `cava` as the only child process.
+On kitty, Ghostty and WezTerm the logo and album art are drawn as real images with the kitty graphics protocol. Anywhere else, `image.logo_mode` and `image.cover_mode` fall back to `blocks` automatically. The text modes are:
 
-## Pictures
+- `blocks` half blocks, two true-colour pixels per cell. Cleanest colour.
+- `braille` 2×4 dithered dots per cell. Finest detail, needs a font with braille.
+- `ascii` characters picked by brightness, with `/ \ | -` drawn on edges.
+- `none` no picture.
 
-On kitty the logo and album art are sent with the kitty graphics protocol, so
-they are actual images rather than characters. Ghostty and WezTerm work too.
-Anywhere else, `image.logo_mode` and `image.cover_mode` fall back to
-`blocks` automatically. The text modes are:
+Put your logo at `~/.config/termdash/logo.png` (or set `image.logo_path`). If album art ever looks stretched, set `layout.cover_aspect` by hand (2.0 to 2.4). By default it asks the terminal for its cell size.
 
-- `blocks` — half blocks, two true-colour pixels per cell. Cleanest colour.
-- `braille` — 2×4 dithered dots per cell. Finest detail, needs a font with braille.
-- `ascii` — characters picked by brightness, with `/ \ | -` drawn on edges.
-- `none` — no picture.
+### Music player
 
-Put the logo at `~/.config/termdash/logo.png` (or set `image.logo_path`).
-`--image MODE` overrides the mode for one run, which is handy for comparing them.
-
-## The track table
+On Linux, anything that speaks MPRIS shows up (Spotify, mpv, VLC, Firefox ...). If several are running, whichever is actually playing wins, unless `player.name` picks one. The track position is interpolated between polls, so the progress bar moves smoothly.
 
 ```
 Time    │ Artist           │ Title/Filename   │ Album
@@ -60,123 +104,54 @@ Time    │ Artist           │ Title/Filename   │ Album
 00:41   │ Godspeed You! Bl │ Sleep / Monheim  │ Lift Your Sk
 ```
 
-`player.table_style` is `"unicode"` for the box-drawing lines above,
-`"ascii"` for `|` and `+`, or `"none"` for plain blank columns.
+`player.table_style` is `"unicode"`, `"ascii"` or `"none"`. The title column takes whatever room is left, so the columns always add up to `layout.player_width`.
 
-The title column takes whatever is left over, so the columns and their
-dividers always add up to `layout.player_width` exactly, whatever widths you
-ask for. `col_title` is only the width it starts from; shrink `col_artist`
-or `col_album` to give the title more room.
+In live mode, text that's too long for its column scrolls. A new track is held still for `scroll_delay` seconds, then moves at `scroll_speed` columns per second. Set `player.scroll = false` to cut it off instead.
 
-## Long track names
+### Right-to-left text
 
-Nothing can run into the column after it: the divider always survives, and
-with `table_style = "none"` a blank `column_gap` is kept instead. One-shot
-mode cuts the text there and leaves it still.
+Arabic, Hebrew and other right-to-left titles are shaped and reordered before they reach the terminal, since most terminals don't do it themselves. Terminals disagree about how much they handle, so if a title comes out wrong, run:
 
-Live mode scrolls anything too long to fit. A new track sits still for
-`scroll_delay` seconds so it can be read at a glance, then moves at
-`scroll_speed` columns per second, with `scroll_gap` between the end and the
-start as it comes round. Text that already fits never moves. Set
-`player.scroll = false` to cut it off instead.
-
-## Right-to-left text
-
-Terminals, kitty included, print the characters they are given from left to
-right and do not join Arabic letters, so Arabic titles arrive backwards with
-every letter in its isolated form. termdash does both jobs before the text
-reaches the screen: it picks the initial / medial / final form of each letter
-from its neighbours (joining lam-alef into its single glyph), then runs the
-Unicode bidirectional algorithm so right-to-left runs come out in reading
-order. Hebrew, Syriac, Thaana and the rest get the reordering too.
-
-The base direction is held left-to-right on purpose, because the dashboard is
-a grid of fixed columns and an Arabic value should not throw the rest of its
-line to the other side of the slot. Text is also cut to width *before* it is
-reordered, so a long title loses its end rather than its beginning.
-
-**If it still comes out wrong**, the problem is that terminals disagree about
-how much of this they do themselves, and doing a job twice looks as wrong as
-not doing it at all. Run:
-
-```sh
+```bash
 termdash --debug-text "مرحبا بالعالم"
 ```
 
-It prints the same text four ways. Whichever one reads correctly in your
-terminal, put its name in the config:
+It prints the text four ways. Put the one that reads correctly in the config:
 
 ```toml
 [text]
-rtl = "shape-and-reorder"   # join and reorder   (the default)
-# rtl = "reorder-only"      # for a terminal that shapes Arabic itself
-# rtl = "shape-only"        # for a terminal that reorders but does not shape
-# rtl = "off"               # send the text exactly as it arrived
+rtl = "shape-and-reorder" # the default
+# rtl = "reorder-only" # for a terminal that shapes Arabic itself
+# rtl = "shape-only" # for a terminal that reorders but does not shape
+# rtl = "off" # sends the text exactly as it arrived
 ```
 
-If all four come out as boxes or empty squares, it is the font rather than
-the text, and the terminal needs one carrying the Arabic Presentation Forms
-(U+FE70–U+FEFF).
+If all four show boxes, your font is missing the Arabic Presentation Forms (U+FE70–U+FEFF).
 
-The shaping and reordering themselves are checked against the reference
-implementations (`arabic-reshaper` and `python-bidi`) and match them exactly
-on Arabic, Persian and Hebrew, with harakat, mixed Latin and digits.
+### Caching
 
-## Configuration
+- The package count is cached for an hour in `~/.cache/termdash/packages` and refreshed in the background, so new terminals don't wait on `rpm -qa`.
+- Remote album art is downloaded once with `curl` and cached in `~/.cache/termdash/art`.
 
-`~/.config/termdash/config.toml` is written on first run and every setting is
-commented in it. A typo is reported with its line number rather than silently
-ignored. Highlights:
+## Shell autorun
 
-- `[info] rows` — which specs to show and in what order. Beyond the old list
-  there are now `swap`, `loadavg`, `battery`, `wm`, `de`, `locale` and `user`.
-- `[info.labels]` — rename any row.
-- `[clocks] entries` — as many clocks as you like, not exactly three.
-- `[timers] extra` — your own countdowns.
-- `[colors]` — names, `#rrggbb`, `r,g,b` or a 256-colour index.
-- `[layout]` — panel widths, and `mode` to force side-by-side or stacked.
-  `cover_aspect` is normally left at 0, which asks the terminal for its real
-  character cell size so album art comes out square; set it by hand (2.0 to
-  2.4) only if the art ever looks stretched.
-- `[image]` — mode, fit, saturation, gamma, contrast, sharpening, tint.
-- `[audio]` — the cava settings; `cava.conf` is regenerated when they change.
+The install script can add `termdash` to your zsh, bash or fish config so it draws in every new terminal. It asks first, or set `TERMDASH_AUTORUN`.
 
-## Flags
+## Development
 
-```
--1, --once            draw once and exit
--l, --live            keep updating
--c, --config PATH     use a different config file
-    --image MODE      kitty | blocks | braille | ascii | none
-    --print-config    print the default config
-    --config-path     print where the config lives
--h, --help            help
--V, --version         version
+```bash
+cargo test
 ```
 
-`general.default_mode` decides what plain `termdash` does.
+To try the player panel without playing anything, there's a fake MPRIS player in `examples/` (Linux only):
 
-## Notes
+```bash
+dbus-run-session -- bash -c '
+  cargo run --release --features fake-player --example fake_player -- "A very long title" "Artist" "Album" &
+  sleep 1
+  cargo run --release -- --live
+'
+```
 
-- The player uses MPRIS, so Spotify, mpv, VLC, Firefox and anything else that
-  speaks it will show up. `player.name` picks one if several are running;
-  otherwise whichever is actually playing wins.
-- The track position is interpolated between polls, so the counter and
-  progress bar move smoothly instead of jumping once a second.
-- The package count is cached for an hour in `~/.cache/termdash/packages` and
-  refreshed in the background, because `rpm -qa` takes a few hundred
-  milliseconds and would otherwise slow down every new terminal.
-- Remote album art is downloaded once with `curl` and cached in
-  `~/.cache/termdash/art`.
-- `cargo test` covers the layout, the colour parsing, the image modes, the
-  cava parsing, the scrolling and the date arithmetic.
-- To try the player panel without playing anything, there is a stand-in MPRIS
-  player in `examples/`:
-
-  ```sh
-  dbus-run-session -- bash -c '
-    cargo run --release --features fake-player --example fake_player -- "A very long title" "Artist" "Album" &
-    sleep 1
-    cargo run --release -- --live
-  '
-  ```
+## Related projects
+[cc-store](https://github.com/caml-cc/cc-store.git) a small Rust CLI for uploading files to your own self-hosted API.
