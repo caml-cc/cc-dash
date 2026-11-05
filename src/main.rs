@@ -173,7 +173,7 @@ fn debug_text(input: &str) {
         if text::has_rtl(input) { "yes" } else { "no" }
     );
     println!("\ninput        {}\n  codepoints {}\n", input, cps(input));
-    println!("Which of these four reads correctly?\n");
+    println!("Which of these reads correctly?\n");
     for m in text::RtlMode::ALL {
         let out = text::for_display_with(input, m);
         println!("  {:<18} {}", m.name(), out);
@@ -183,7 +183,7 @@ fn debug_text(input: &str) {
     println!("    [text]");
     println!("    rtl = \"<that name>\"");
     println!();
-    println!("If all four look like boxes, empty squares or the wrong letters,");
+    println!("If they all look like boxes, empty squares or the wrong letters,");
     println!("it is the font rather than the text: the terminal needs one with");
     println!("the Arabic Presentation Forms (U+FE70 to U+FEFF).");
 }

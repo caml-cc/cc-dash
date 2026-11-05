@@ -20,11 +20,14 @@ quit_keys = true            # q or Esc leaves live mode
 # about how much of that they do themselves, and doing a job twice looks as
 # wrong as not doing it at all. Run
 #     cc-dash --debug-text "مرحبا بالعالم"
-# which prints all four options, see which one reads correctly in YOUR
+# which prints every option, see which one reads correctly in YOUR
 # terminal, and put its name here.
 #   "shape-and-reorder"  join the letters and reorder  (the default)
 #   "reorder-only"       reorder only, for a terminal that shapes Arabic itself
 #   "shape-only"         join only, for a terminal that reorders but not shapes
+#   "word-order"         reverse the word order only, for a terminal (kitty)
+#                        that draws each word right but lays the words out
+#                        left to right
 #   "off"                send the text exactly as it arrived
 rtl = "shape-and-reorder"
 

@@ -13,6 +13,11 @@
 //!
 //! Hebrew and the other right-to-left scripts need no joining, but they do need
 //! step 2, and they get it for free.
+//!
+//! Some terminals, kitty among them, already draw each word right to left with
+//! its letters joined, but still lay the words themselves out left to right, so
+//! a sentence comes out with its words in the opposite order. For those there
+//! is a word-level reorder that moves whole words and leaves their letters be.
 
 use std::sync::OnceLock;
 use unicode_bidi::BidiInfo;
@@ -46,8 +51,8 @@ fn reshaper() -> &'static ar_reshaper::ArabicReshaper {
 /// Terminals disagree about how much they handle themselves. kitty, for
 /// instance, shapes Arabic with HarfBuzz but does no reordering; others do
 /// neither, and a few do both. Doing a job the terminal also does can be worse
-/// than doing nothing, so this is switchable and `--debug-text` prints all
-/// four so you can see which one your terminal actually wants.
+/// than doing nothing, so this is switchable and `--debug-text` prints every
+/// mode so you can see which one your terminal actually wants.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RtlMode {
     /// Join the letters and reorder. The default.
@@ -56,6 +61,10 @@ pub enum RtlMode {
     ReorderOnly,
     /// Join only, for a terminal that reorders but does not shape.
     ShapeOnly,
+    /// Reverse the order of the words but not the letters inside them, for a
+    /// terminal that draws each word correctly but puts the words in the
+    /// wrong order. No joining: such a terminal shapes the letters itself.
+    WordOrder,
     /// Send the text exactly as it came.
     Off,
 }
@@ -65,6 +74,7 @@ impl RtlMode {
         match s.trim().to_lowercase().replace('_', "-").as_str() {
             "reorder-only" | "reorder" => RtlMode::ReorderOnly,
             "shape-only" | "shape" => RtlMode::ShapeOnly,
+            "word-order" | "words" | "reorder-words" => RtlMode::WordOrder,
             "off" | "none" | "raw" => RtlMode::Off,
             _ => RtlMode::ShapeAndReorder,
         }
@@ -74,13 +84,15 @@ impl RtlMode {
             RtlMode::ShapeAndReorder => "shape-and-reorder",
             RtlMode::ReorderOnly => "reorder-only",
             RtlMode::ShapeOnly => "shape-only",
+            RtlMode::WordOrder => "word-order",
             RtlMode::Off => "off",
         }
     }
-    pub const ALL: [RtlMode; 4] = [
+    pub const ALL: [RtlMode; 5] = [
         RtlMode::ShapeAndReorder,
         RtlMode::ReorderOnly,
         RtlMode::ShapeOnly,
+        RtlMode::WordOrder,
         RtlMode::Off,
     ];
 }
@@ -113,6 +125,44 @@ fn reorder(s: &str) -> String {
     out
 }
 
+/// Like `reorder`, but whole words move instead of single characters: the
+/// words of a right-to-left run come out in reverse order while each word
+/// keeps its letters in logical order, for the terminal to draw itself.
+fn reorder_words(s: &str) -> String {
+    let bidi = BidiInfo::new(s, Some(unicode_bidi::Level::ltr()));
+    let mut out = String::with_capacity(s.len());
+    for para in &bidi.paragraphs {
+        let line = para.range.clone();
+        let (levels, runs) = bidi.visual_runs(para, line);
+        // runs are already in visual order, each at a single embedding level
+        for run in runs {
+            let text = &s[run.clone()];
+            if !levels[run.start].is_rtl() {
+                out.push_str(text);
+                continue;
+            }
+            // split into words and the whitespace between them, then lay the
+            // pieces out back to front
+            let mut pieces: Vec<&str> = Vec::new();
+            let mut start = 0;
+            let mut prev_ws: Option<bool> = None;
+            for (i, c) in text.char_indices() {
+                let ws = c.is_whitespace();
+                if prev_ws.is_some_and(|p| p != ws) {
+                    pieces.push(&text[start..i]);
+                    start = i;
+                }
+                prev_ws = Some(ws);
+            }
+            pieces.push(&text[start..]);
+            for p in pieces.iter().rev() {
+                out.push_str(p);
+            }
+        }
+    }
+    out
+}
+
 /// Apply one particular mode, whatever the configured one is.
 pub fn for_display_with(s: &str, mode: RtlMode) -> String {
     if !has_rtl(s) {
@@ -122,6 +172,7 @@ pub fn for_display_with(s: &str, mode: RtlMode) -> String {
         RtlMode::ShapeAndReorder => reorder(&reshaper().reshape(s)),
         RtlMode::ReorderOnly => reorder(s),
         RtlMode::ShapeOnly => reshaper().reshape(s),
+        RtlMode::WordOrder => reorder_words(s),
         RtlMode::Off => s.to_string(),
     }
 }
@@ -277,6 +328,34 @@ mod tests {
         for m in RtlMode::ALL {
             assert_eq!(for_display_with("Nothing playing", m), "Nothing playing");
         }
+    }
+
+    #[test]
+    fn word_order_moves_words_not_letters() {
+        // "مرحبا بالعالم" (hello world): two words, letters untouched
+        let world = "\u{0628}\u{0627}\u{0644}\u{0639}\u{0627}\u{0644}\u{0645}";
+        let s = format!("{} {}", HELLO, world);
+        assert_eq!(for_display_with(&s, RtlMode::WordOrder), format!("{} {}", world, HELLO));
+
+        // a single word is left exactly as it came
+        assert_eq!(for_display_with(HELLO, RtlMode::WordOrder), HELLO);
+
+        // three words, and runs of spaces keep their width
+        let three = format!("{}  {} {}", HELLO, world, "\u{0644}\u{0627}");
+        assert_eq!(
+            for_display_with(&three, RtlMode::WordOrder),
+            format!("{} {}  {}", "\u{0644}\u{0627}", world, HELLO)
+        );
+
+        // English around the Arabic stays put, and so do digits
+        let mixed = format!("[{} {}] 157 Days", HELLO, world);
+        assert_eq!(
+            for_display_with(&mixed, RtlMode::WordOrder),
+            format!("[{} {}] 157 Days", world, HELLO)
+        );
+        let num = format!("{} 2026", HELLO);
+        assert!(for_display_with(&num, RtlMode::WordOrder).contains("2026"));
+        assert_eq!(width(&for_display_with(&mixed, RtlMode::WordOrder)), width(&mixed));
     }
 
     #[test]
