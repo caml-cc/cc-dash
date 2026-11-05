@@ -41,7 +41,7 @@ fn reshaper() -> &'static ar_reshaper::ArabicReshaper {
     R.get_or_init(ar_reshaper::ArabicReshaper::default)
 }
 
-/// Which parts of the right-to-left work termdash should do.
+/// Which parts of the right-to-left work cc-dash should do.
 ///
 /// Terminals disagree about how much they handle themselves. kitty, for
 /// instance, shapes Arabic with HarfBuzz but does no reordering; others do

@@ -1,5 +1,5 @@
-# termdash configuration
-# ~/.config/termdash/config.toml
+# cc-dash configuration
+# ~/.config/cc-dash/config.toml
 #
 # Every value below is the built-in default, so deleting a line changes nothing.
 # Colours accept:  "cyan"  "#38bdf8"  "56,189,248"  "74" (256-colour index)
@@ -9,7 +9,7 @@
 [general]
 title = ""                  # blank = user@hostname
 os_name = ""                # blank = PRETTY_NAME from /etc/os-release
-default_mode = "once"       # what plain `termdash` does: "once" or "live"
+default_mode = "once"       # what plain `cc-dash` does: "once" or "live"
 fps = 30                    # redraw cap in live mode
 packages_cache_secs = 3600  # how long the rpm count is reused
 quit_keys = true            # q or Esc leaves live mode
@@ -19,7 +19,7 @@ quit_keys = true            # q or Esc leaves live mode
 # and their words reordered before a terminal can show them. Terminals disagree
 # about how much of that they do themselves, and doing a job twice looks as
 # wrong as not doing it at all. Run
-#     termdash --debug-text "مرحبا بالعالم"
+#     cc-dash --debug-text "مرحبا بالعالم"
 # which prints all four options, see which one reads correctly in YOUR
 # terminal, and put its name here.
 #   "shape-and-reorder"  join the letters and reorder  (the default)
@@ -114,7 +114,7 @@ col_album = 12              # is only the width it starts from.
 logo_mode = "kitty"
 cover_mode = "kitty"
 fit = "cover"               # "cover" crops to fill, "contain" fits the whole picture
-logo_path = ""              # blank = the first ~/.config/termdash/logo.* file
+logo_path = ""              # blank = the first ~/.config/cc-dash/logo.* file
 fallback_cover = ""         # picture to show when nothing is playing
 saturation = 1.25
 gamma = 1.0                 # above 1 brightens the midtones
@@ -132,14 +132,14 @@ cell_height_px = 20
 [audio]
 show = true
 cava_path = "cava"
-cava_config = ""            # blank = termdash writes cava.conf next to this file
+cava_config = ""            # blank = cc-dash writes cava.conf next to this file
 method = "pulse"            # PipeWire answers on the pulse interface; macOS uses cava's CoreAudio tap
 source = "auto"
 framerate = 60
 lower_cutoff_freq = 40
 higher_cutoff_freq = 12000
 noise_reduction = 60
-smooth = 0.35               # extra smoothing done by termdash, 0 = off
+smooth = 0.35               # extra smoothing done by cc-dash, 0 = off
 bar_width = 0               # 0 = fit the player panel
 labels = ["Bass", "Mid", "Treble", "Volume"]
 

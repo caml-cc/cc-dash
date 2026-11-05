@@ -179,7 +179,7 @@ fn cache_path() -> PathBuf {
         .ok()
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| format!("{}/.cache", std::env::var("HOME").unwrap_or_else(|_| "/tmp".into())));
-    PathBuf::from(base).join("termdash/packages")
+    PathBuf::from(base).join("cc-dash/packages")
 }
 
 /// Return the cached package count, and refresh it in the background when stale.

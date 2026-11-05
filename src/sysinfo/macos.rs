@@ -86,7 +86,7 @@ fn cache_file(name: &str) -> PathBuf {
         .ok()
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| format!("{}/.cache", std::env::var("HOME").unwrap_or_else(|_| "/tmp".into())));
-    PathBuf::from(base).join("termdash").join(name)
+    PathBuf::from(base).join("cc-dash").join(name)
 }
 
 /// system_profiler takes the best part of a second, and the GPU never

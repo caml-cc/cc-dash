@@ -1,27 +1,63 @@
 #!/usr/bin/env bash
-# termdash installer for Ubuntu/Debian, Fedora and macOS, with zsh, bash or fish.
+# cc-dash installer for Ubuntu/Debian, Fedora and macOS, with zsh, bash or fish.
 #
-#   ./install.sh
+#   curl -fsSLO https://raw.githubusercontent.com/caml-cc/cc-dash/main/scripts/install.sh
+#   bash install.sh
 #
-# It looks at your OS and $SHELL and does the right thing for each.
+# It looks at your OS and $SHELL and does the right thing for each. The repo is
+# cloned into a temporary directory and built there; the clone and this script
+# are deleted once the install is done.
 #
 # Env switches:
 #   SKIP_PACKAGES=1     don't install anything with apt / dnf / brew
 #   PREFIX=~/.local     where the binary goes (default ~/.local)
-#   TERMDASH_AUTORUN=1  add termdash to your shell rc without asking (0 = never)
-#   TERMDASH_MULTIOUT=1 macOS BlackHole fallback only: switch sound output to the
+#   CC_DASH_REPO=url    git repo to clone (default https://github.com/caml-cc/cc-dash.git)
+#   CC_DASH_REF=name    branch or tag to build (default: the repo's default branch)
+#   CC_DASH_AUTORUN=1   add cc-dash to your shell rc without asking (0 = never)
+#   CC_DASH_MULTIOUT=1  macOS BlackHole fallback only: switch sound output to the
 #                       multi-output device without asking (0 = never)
 set -euo pipefail
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SELF="${BASH_SOURCE[0]:-}"
+REPO="${CC_DASH_REPO:-https://github.com/caml-cc/cc-dash.git}"
+REF="${CC_DASH_REF:-}"
 PREFIX="${PREFIX:-$HOME/.local}"
 BINDIR="$PREFIX/bin"
-CFGDIR="${XDG_CONFIG_HOME:-$HOME/.config}/termdash"
+CFGDIR="${XDG_CONFIG_HOME:-$HOME/.config}/cc-dash"
 MIN_RUST="1.78"
+
+# Earlier versions were called termdash; their files are migrated below.
+OLD_CFGDIR="${XDG_CONFIG_HOME:-$HOME/.config}/termdash"
+OLD_CACHEDIR="${XDG_CACHE_HOME:-$HOME/.cache}/termdash"
 
 say() { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m==>\033[0m %s\n' "$*" >&2; exit 1; }
+
+# The temporary clone goes away however the script ends.
+WORK=""
+cleanup() {
+  if [ -n "$WORK" ]; then rm -rf "$WORK"; fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+# Remove a "# >>> tag >>>" ... "# <<< tag <<<" block (and the blank line before
+# it) from a file. Returns 1 when the block was not there.
+strip_block() {
+  local f="$1" tag="$2" tmp
+  [ -f "$f" ] && grep -qF "# >>> $tag >>>" "$f" || return 1
+  tmp="$(mktemp)"
+  awk -v s="# >>> $tag >>>" -v e="# <<< $tag <<<" '
+    $0 == s { skip = 1; blank = 0; next }
+    skip    { if ($0 == e) skip = 0; next }
+    blank   { print ""; blank = 0 }
+    $0 == "" { blank = 1; next }
+    { print }
+    END { if (blank) print "" }
+  ' "$f" > "$tmp" && cat "$tmp" > "$f"
+  rm -f "$tmp"
+}
 
 # ---------------------------------------------------------------- detect OS
 OS=""        # macos | ubuntu | fedora
@@ -45,17 +81,18 @@ case "$(uname -s)" in
     esac
     if [ -z "$OS" ]; then
       die "Unsupported Linux distribution '${ID_:-unknown}'. This installer knows Ubuntu/Debian and Fedora.
-    Install a Rust toolchain (>= $MIN_RUST) yourself, run 'cargo build --release', and copy
-    target/release/termdash somewhere on your PATH."
+    Install a Rust toolchain (>= $MIN_RUST) yourself, clone $REPO, run
+    'cargo build --release', and copy target/release/cc-dash somewhere on your PATH."
     fi
     ;;
   *)
-    die "Unsupported OS '$(uname -s)'. termdash runs on Linux and macOS."
+    die "Unsupported OS '$(uname -s)'. cc-dash runs on Linux and macOS."
     ;;
 esac
 
 # ---------------------------------------------------------------- detect shell
 SHELL_NAME="$(basename "${SHELL:-/bin/sh}")"
+OLD_FISH_RC=""
 case "$SHELL_NAME" in
   zsh)
     RC="${ZDOTDIR:-$HOME}/.zshrc"
@@ -65,7 +102,8 @@ case "$SHELL_NAME" in
     if [ "$OS" = macos ]; then RC="$HOME/.bash_profile"; else RC="$HOME/.bashrc"; fi
     ;;
   fish)
-    RC="${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/termdash.fish"
+    RC="${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/cc-dash.fish"
+    OLD_FISH_RC="${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/termdash.fish"
     ;;
   *)
     warn "Shell '$SHELL_NAME' is not zsh, bash or fish; I will not touch any rc file."
@@ -102,7 +140,7 @@ if [ -z "${SKIP_PACKAGES:-}" ]; then
     apt)
       say "Installing build tools (asks for your password)"
       sudo apt-get update
-      sudo apt-get install -y build-essential curl pkg-config
+      sudo apt-get install -y build-essential curl git pkg-config
       rust_ok || sudo apt-get install -y cargo rustc
       # cava is optional: without it the audio meters simply stay at zero.
       command -v cava >/dev/null || sudo apt-get install -y cava \
@@ -110,16 +148,17 @@ if [ -z "${SKIP_PACKAGES:-}" ]; then
       ;;
     dnf)
       say "Installing build tools (asks for your password)"
-      sudo dnf install -y gcc curl pkgconf-pkg-config
+      sudo dnf install -y gcc curl git pkgconf-pkg-config
       rust_ok || sudo dnf install -y cargo rust
       command -v cava >/dev/null || sudo dnf install -y cava \
         || warn "cava is not in your repos - the audio meters will stay at 0"
       ;;
     brew)
+      # The Xcode command line tools also bring git.
       if ! xcode-select -p >/dev/null 2>&1; then
         say "Installing the Xcode command line tools (a dialog will pop up)"
         xcode-select --install || true
-        die "Finish the Xcode tools install, then run ./install.sh again."
+        die "Finish the Xcode tools install, then run this installer again."
       fi
       if ! command -v brew >/dev/null; then
         for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
@@ -144,27 +183,47 @@ if ! rust_ok; then
   fi
 fi
 if ! command -v cargo >/dev/null && [ -f "$HOME/.cargo/env" ]; then
+  # shellcheck disable=SC1091
   . "$HOME/.cargo/env"
 fi
 rust_ok || die "Rust $MIN_RUST or newer is required (found: $(rustc --version 2>/dev/null || echo none))."
+command -v git >/dev/null || die "git is needed to download cc-dash"
+
+# ---------------------------------------------------------------- download
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/cc-dash.XXXXXX")"
+SRC="$WORK/cc-dash"
+say "Cloning $REPO${REF:+ ($REF)}"
+git clone --quiet --depth 1 ${REF:+--branch "$REF"} "$REPO" "$SRC"
 
 # ---------------------------------------------------------------- build
 say "Building (first build takes a minute or two)"
-cargo build --release --manifest-path "$HERE/Cargo.toml"
+cargo build --release --manifest-path "$SRC/Cargo.toml"
+
+# Carry a termdash config over before anything is written to the new place.
+if [ -d "$OLD_CFGDIR" ] && [ ! -e "$CFGDIR" ]; then
+  mv "$OLD_CFGDIR" "$CFGDIR"
+  say "Moved your termdash config to $CFGDIR"
+fi
 
 mkdir -p "$BINDIR" "$CFGDIR"
-install -m 755 "$HERE/target/release/termdash" "$BINDIR/termdash"
-say "Installed $BINDIR/termdash"
+install -m 755 "$SRC/target/release/cc-dash" "$BINDIR/cc-dash"
+say "Installed $BINDIR/cc-dash"
+
+if [ -e "$BINDIR/termdash" ]; then
+  rm -f "$BINDIR/termdash"
+  say "Removed the old $BINDIR/termdash"
+fi
+rm -rf "$OLD_CACHEDIR"
 
 # Old Python/bash helper from the previous version is no longer used.
 if [ -e "$HOME/.local/bin/img2ascii" ]; then
   warn "img2ascii from the old version is no longer needed; remove it when you like"
 fi
 
-# termdash writes this on first run anyway; do it now so there is something
+# cc-dash writes this on first run anyway; do it now so there is something
 # to read and edit before the first launch.
 if [ ! -f "$CFGDIR/config.toml" ]; then
-  "$BINDIR/termdash" --print-config > "$CFGDIR/config.toml"
+  "$BINDIR/cc-dash" --print-config > "$CFGDIR/config.toml"
 fi
 say "Config at $CFGDIR/config.toml"
 
@@ -174,7 +233,7 @@ say "Config at $CFGDIR/config.toml"
 # fall back to BlackHole, a virtual device that carries system audio, with a
 # Multi-Output Device that plays to the speakers and BlackHole at once.
 BH_NAME="BlackHole 2ch"
-MULTI_UID="com.termdash.output"
+MULTI_NAME="cc-dash Output"
 
 # Creates the Multi-Output Device (speakers + BlackHole), or makes it the
 # default output. Usage: audio_helper create | select
@@ -185,7 +244,9 @@ audio_helper() {
 import CoreAudio
 import Foundation
 
-let multiUID = "com.termdash.output"
+let multiUID = "com.cc-dash.output"
+// A device made by the termdash installer works just as well.
+let knownUIDs = [multiUID, "com.termdash.output"]
 
 func prop(_ s: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
     AudioObjectPropertyAddress(mSelector: s, mScope: kAudioObjectPropertyScopeGlobal,
@@ -218,7 +279,7 @@ func defaultOutput() -> AudioDeviceID {
 }
 
 let all = devices()
-let multi = all.first { string($0, kAudioDevicePropertyDeviceUID) == multiUID }
+let multi = all.first { knownUIDs.contains(string($0, kAudioDevicePropertyDeviceUID) ?? "") }
 
 switch CommandLine.arguments.dropFirst().first ?? "" {
 case "create":
@@ -234,7 +295,7 @@ case "create":
         exit(3)
     }
     let desc: [String: Any] = [
-        kAudioAggregateDeviceNameKey: "Termdash Output",
+        kAudioAggregateDeviceNameKey: "cc-dash Output",
         kAudioAggregateDeviceUIDKey: multiUID,
         kAudioAggregateDeviceIsStackedKey: 1,
         kAudioAggregateDeviceMainSubDeviceKey: realUID,
@@ -278,7 +339,7 @@ setup_macos_audio() {
 
   cava_can_tap || brew upgrade cava >/dev/null 2>&1 || true
   if cava_can_tap; then
-    # termdash's defaults already mean "tap the system output" on macOS, so
+    # cc-dash's defaults already mean "tap the system output" on macOS, so
     # there is nothing to change in config.toml.
     say "Audio meters: cava taps the system output directly (no extra drivers)"
     say "macOS will ask to let your terminal record system audio. Allow it once; this is"
@@ -316,7 +377,7 @@ setup_macos_audio() {
   fi
 
   if audio_helper create "$BH_NAME"; then
-    say "Made the 'Termdash Output' device (your speakers + $BH_NAME)"
+    say "Made the '$MULTI_NAME' device (your speakers + $BH_NAME)"
   else
     warn "could not make the Multi-Output Device. Make one in Audio MIDI Setup
     (speakers + $BH_NAME), set it as your output, and you are done."
@@ -329,18 +390,18 @@ setup_macos_audio() {
     say "Set [audio] method = \"portaudio\", source = \"$BH_NAME\" in config.toml"
   fi
 
-  local ans="${TERMDASH_MULTIOUT:-}"
+  local ans="${CC_DASH_MULTIOUT:-}"
   if [ -z "$ans" ] && [ -t 0 ]; then
-    warn "The meters only move while 'Termdash Output' is your sound output."
+    warn "The meters only move while '$MULTI_NAME' is your sound output."
     warn "macOS disables the volume keys on a Multi-Output Device; use the volume of the app instead."
-    read -r -p "Switch your sound output to 'Termdash Output' now? [y/N] " yn
+    read -r -p "Switch your sound output to '$MULTI_NAME' now? [y/N] " yn
     case "$yn" in [Yy]*) ans=1 ;; *) ans=0 ;; esac
   fi
   if [ "$ans" = 1 ]; then
-    audio_helper select && say "Sound output is now 'Termdash Output'" \
-      || warn "could not switch the output; pick 'Termdash Output' in System Settings > Sound"
+    audio_helper select && say "Sound output is now '$MULTI_NAME'" \
+      || warn "could not switch the output; pick '$MULTI_NAME' in System Settings > Sound"
   else
-    say "Pick 'Termdash Output' in System Settings > Sound > Output when you want the meters"
+    say "Pick '$MULTI_NAME' in System Settings > Sound > Output when you want the meters"
   fi
 }
 setup_macos_audio
@@ -351,25 +412,39 @@ if [ -n "$RC" ]; then
   mkdir -p "$(dirname "$RC")"
   touch "$RC"
 
+  # --- blocks left by termdash: drop them, and keep autorun if it was on
+  OLD_AUTORUN=""
+  if [ -n "$OLD_FISH_RC" ] && [ -f "$OLD_FISH_RC" ]; then
+    grep -qF '# >>> termdash autorun >>>' "$OLD_FISH_RC" && OLD_AUTORUN=1
+    rm -f "$OLD_FISH_RC"
+    say "Removed the old $OLD_FISH_RC"
+  fi
+  if strip_block "$RC" "termdash autorun"; then OLD_AUTORUN=1; fi
+  strip_block "$RC" "termdash path" || true
+  if [ -n "$OLD_AUTORUN" ] && [ -z "${CC_DASH_AUTORUN:-}" ]; then
+    CC_DASH_AUTORUN=1
+    say "termdash autorun was on; switching it over to cc-dash"
+  fi
+
   # --- PATH
-  if ! grep -q '# >>> termdash path >>>' "$RC"; then
+  if ! grep -qF '# >>> cc-dash path >>>' "$RC"; then
     case "$SHELL_NAME" in
       fish)
         cat >> "$RC" <<__PATH__
-# >>> termdash path >>>
+# >>> cc-dash path >>>
 fish_add_path -g "$BINDIR"
-# <<< termdash path <<<
+# <<< cc-dash path <<<
 __PATH__
         ;;
       *)
         cat >> "$RC" <<__PATH__
 
-# >>> termdash path >>>
+# >>> cc-dash path >>>
 case ":\$PATH:" in
   *":$BINDIR:"*) ;;
   *) export PATH="$BINDIR:\$PATH" ;;
 esac
-# <<< termdash path <<<
+# <<< cc-dash path <<<
 __PATH__
         ;;
     esac
@@ -377,10 +452,10 @@ __PATH__
   fi
 
   # --- autorun
-  if ! grep -q '# >>> termdash autorun >>>' "$RC"; then
-    ans="${TERMDASH_AUTORUN:-}"
+  if ! grep -qF '# >>> cc-dash autorun >>>' "$RC"; then
+    ans="${CC_DASH_AUTORUN:-}"
     if [ -z "$ans" ] && [ -t 0 ]; then
-      read -r -p "Draw termdash in every new $SHELL_NAME terminal? [y/N] " yn
+      read -r -p "Draw cc-dash in every new $SHELL_NAME terminal? [y/N] " yn
       case "$yn" in [Yy]*) ans=1 ;; *) ans=0 ;; esac
     fi
     if [ "$ans" = 1 ]; then
@@ -388,38 +463,38 @@ __PATH__
         zsh)
           cat >> "$RC" <<'__RUN__'
 
-# >>> termdash autorun >>>
+# >>> cc-dash autorun >>>
 # If you use powerlevel10k, move this block ABOVE its "instant prompt" block.
-if [[ -o interactive && -t 1 && -z "$TERMDASH_SHOWN" ]] && command -v termdash >/dev/null; then
-  export TERMDASH_SHOWN=1
-  termdash
+if [[ -o interactive && -t 1 && -z "$CC_DASH_SHOWN" ]] && command -v cc-dash >/dev/null; then
+  export CC_DASH_SHOWN=1
+  cc-dash
 fi
-# <<< termdash autorun <<<
+# <<< cc-dash autorun <<<
 __RUN__
           ;;
         bash)
           cat >> "$RC" <<'__RUN__'
 
-# >>> termdash autorun >>>
-if [[ $- == *i* && -t 1 && -z "${TERMDASH_SHOWN:-}" ]] && command -v termdash >/dev/null; then
-  export TERMDASH_SHOWN=1
-  termdash
+# >>> cc-dash autorun >>>
+if [[ $- == *i* && -t 1 && -z "${CC_DASH_SHOWN:-}" ]] && command -v cc-dash >/dev/null; then
+  export CC_DASH_SHOWN=1
+  cc-dash
 fi
-# <<< termdash autorun <<<
+# <<< cc-dash autorun <<<
 __RUN__
           ;;
         fish)
           cat >> "$RC" <<'__RUN__'
-# >>> termdash autorun >>>
-if status is-interactive; and isatty stdout; and not set -q TERMDASH_SHOWN; and command -q termdash
-    set -gx TERMDASH_SHOWN 1
-    termdash
+# >>> cc-dash autorun >>>
+if status is-interactive; and isatty stdout; and not set -q CC_DASH_SHOWN; and command -q cc-dash
+    set -gx CC_DASH_SHOWN 1
+    cc-dash
 end
-# <<< termdash autorun <<<
+# <<< cc-dash autorun <<<
 __RUN__
           ;;
       esac
-      say "termdash will draw in every new $SHELL_NAME terminal"
+      say "cc-dash will draw in every new $SHELL_NAME terminal"
     fi
   fi
   RC_SHOW="$RC"
@@ -427,6 +502,14 @@ __RUN__
   SOURCE_HINT="Open a new terminal, or:  source $RC_SHOW"
 else
   SOURCE_HINT="Add $BINDIR to your PATH, then open a new terminal"
+fi
+
+# ---------------------------------------------------------------- clean up
+# The clone goes in the EXIT trap. This script goes too, unless it is the copy
+# tracked in a git checkout (someone running scripts/install.sh from the repo).
+if [ -n "$SELF" ] && [ -f "$SELF" ] \
+   && ! git -C "$(dirname "$SELF")" ls-files --error-unmatch "$(basename "$SELF")" >/dev/null 2>&1; then
+  rm -f "$SELF"
 fi
 
 # ---------------------------------------------------------------- done
@@ -448,8 +531,8 @@ Done.
   1. Put a picture at $CFGDIR/logo.png  (png, jpg, webp, gif, bmp)
   2. $SOURCE_HINT
   3. Try it:
-       termdash           draw once
-       termdash --live    live meters and clocks, q or Ctrl+C quits
+       cc-dash           draw once
+       cc-dash --live    live meters and clocks, q or Ctrl+C quits
 
 Everything is configurable in $CFGDIR/config.toml
 $IMG_NOTE

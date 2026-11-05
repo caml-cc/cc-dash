@@ -90,7 +90,7 @@ fn art_cache_dir() -> PathBuf {
         .ok()
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| format!("{}/.cache", std::env::var("HOME").unwrap_or_else(|_| "/tmp".into())));
-    PathBuf::from(base).join("termdash/art")
+    PathBuf::from(base).join("cc-dash/art")
 }
 
 /// Get the bytes of a cover, from disk or by downloading once and caching.

@@ -80,7 +80,7 @@ pub fn load_bytes(data: &[u8]) -> Result<DynamicImage, String> {
     image::load_from_memory(data).map_err(|e| e.to_string())
 }
 
-/// Find the logo: an explicit path, or the first ~/.config/termdash/logo.*
+/// Find the logo: an explicit path, or the first ~/.config/cc-dash/logo.*
 pub fn find_logo(cfg: &ImageCfg, dir: &Path) -> Option<std::path::PathBuf> {
     if !cfg.logo_path.is_empty() {
         let p = shellexpand(&cfg.logo_path);

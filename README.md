@@ -1,38 +1,54 @@
 # cc-dash
 
-Small Rust terminal dashboard: system specs and clocks on the left, a music player with album art and audio meters on the right. Runs on Linux and macOS. The binary is called `termdash`.
+Small Rust terminal dashboard: system specs and clocks on the left, a music player with album art and audio meters on the right. Runs on Linux and macOS. The binary is called `cc-dash`.
 
 ## Install
 
 ### Option 1: Install script (recommended)
 
 ```bash
-git clone https://github.com/caml-cc/cc-dash.git
-cd cc-dash
-./install.sh
+curl -sL https://raw.githubusercontent.com/caml-cc/cc-dash/refs/heads/main/scripts/install.sh -o install.sh
+bash install.sh
 ```
 
-Works on Ubuntu/Debian, Fedora and macOS with zsh, bash or fish. It installs the build dependencies and `cava` (with apt, dnf or brew), builds the binary, copies it to `~/.local/bin`, and writes a starter config.
+### Option 2: Manual install (system-wide)
+```bash
+curl -sL https://raw.githubusercontent.com/caml-cc/cc-dash/refs/heads/main/scripts/install.sh -o install.sh
+sudo bash install.sh
+```
+
+Works on Ubuntu/Debian, Fedora and macOS with zsh, bash or fish. It installs the build dependencies and `cava` (with apt, dnf or brew), clones this repo into a temporary directory, builds the binary, copies it to `~/.local/bin`, and writes a starter config. When it's done it deletes the temporary clone and itself. (Running `scripts/install.sh` from a checkout of the repo works too, and leaves the checked-in script alone.)
 
 The script takes a few environment switches:
 
 ```bash
-SKIP_PACKAGES=1 ./install.sh # don't install anything with apt / dnf / brew
-PREFIX=~/.local ./install.sh # where the binary goes (default ~/.local)
-TERMDASH_AUTORUN=1 ./install.sh # draw termdash in every new terminal without asking (0 = never)
+SKIP_PACKAGES=1 bash install.sh # don't install anything with apt / dnf / brew
+PREFIX=~/.local bash install.sh # where the binary goes (default ~/.local)
+CC_DASH_REF=v4.3.0 bash install.sh # build a specific branch or tag
+CC_DASH_REPO=<url> bash install.sh # clone from a fork or mirror instead
+CC_DASH_AUTORUN=1 bash install.sh # draw cc-dash in every new terminal without asking (0 = never)
 ```
 
-### Option 2: Build from source
+### Option 3: Build from source
 
 ```bash
 cargo build --release
 ```
 
-Then copy `target/release/termdash` somewhere on your `PATH`. Needs Rust 1.78 or newer. Windows is not supported.
+Then copy `target/release/cc-dash` somewhere on your `PATH`. Needs Rust 1.78 or newer. Windows is not supported.
+
+### Uninstall
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/caml-cc/cc-dash/main/scripts/uninstall.sh
+bash uninstall.sh
+```
+
+It removes the binary, the shell rc blocks, the caches and (on macOS) the Multi-Output Device. It asks before deleting your config and logo (`CC_DASH_PURGE=1` deletes them without asking, `0` keeps them). cava, Rust and BlackHole stay installed.
 
 ## Config
 
-The config lives at `$HOME/.config/termdash/config.toml`. If the file is missing, `termdash` writes one on first run with every setting set to its default and commented. A typo is reported with its line number instead of being ignored.
+The config lives at `$HOME/.config/cc-dash/config.toml`. If the file is missing, `cc-dash` writes one on first run with every setting set to its default and commented. A typo is reported with its line number instead of being ignored.
 
 ```toml
 [layout]
@@ -58,19 +74,19 @@ The main sections:
 - `[audio]` the cava settings. `cava.conf` is regenerated when they change.
 - `[colors]` names, `#rrggbb`, `r,g,b` or a 256-colour index.
 
-`termdash --print-config` prints the full default config.
+`cc-dash --print-config` prints the full default config.
 
 ## Usage
 
 ```bash
-termdash # draws once (or whatever general.default_mode says)
-termdash --live # keeps updating, q, Esc or Ctrl+C to quit
-termdash --once # draws once and exits
-termdash -c ./other.toml # uses a different config file
-termdash --image blocks # overrides the picture mode for one run
-termdash --print-config # prints the default config
-termdash --config-path # prints where the config lives
-termdash --debug-text "مرحبا بالعالم" # shows how right-to-left text is shaped and reordered
+cc-dash # draws once (or whatever general.default_mode says)
+cc-dash --live # keeps updating, q, Esc or Ctrl+C to quit
+cc-dash --once # draws once and exits
+cc-dash -c ./other.toml # uses a different config file
+cc-dash --image blocks # overrides the picture mode for one run
+cc-dash --print-config # prints the default config
+cc-dash --config-path # prints where the config lives
+cc-dash --debug-text "مرحبا بالعالم" # shows how right-to-left text is shaped and reordered
 ```
 
 ### Platforms
@@ -92,7 +108,7 @@ On kitty, Ghostty and WezTerm the logo and album art are drawn as real images wi
 - `ascii` characters picked by brightness, with `/ \ | -` drawn on edges.
 - `none` no picture.
 
-Put your logo at `~/.config/termdash/logo.png` (or set `image.logo_path`). If album art ever looks stretched, set `layout.cover_aspect` by hand (2.0 to 2.4). By default it asks the terminal for its cell size.
+Put your logo at `~/.config/cc-dash/logo.png` (or set `image.logo_path`). If album art ever looks stretched, set `layout.cover_aspect` by hand (2.0 to 2.4). By default it asks the terminal for its cell size.
 
 ### Music player
 
@@ -113,7 +129,7 @@ In live mode, text that's too long for its column scrolls. A new track is held s
 Arabic, Hebrew and other right-to-left titles are shaped and reordered before they reach the terminal, since most terminals don't do it themselves. Terminals disagree about how much they handle, so if a title comes out wrong, run:
 
 ```bash
-termdash --debug-text "مرحبا بالعالم"
+cc-dash --debug-text "مرحبا بالعالم"
 ```
 
 It prints the text four ways. Put the one that reads correctly in the config:
@@ -130,12 +146,12 @@ If all four show boxes, your font is missing the Arabic Presentation Forms (U+FE
 
 ### Caching
 
-- The package count is cached for an hour in `~/.cache/termdash/packages` and refreshed in the background, so new terminals don't wait on `rpm -qa`.
-- Remote album art is downloaded once with `curl` and cached in `~/.cache/termdash/art`.
+- The package count is cached for an hour in `~/.cache/cc-dash/packages` and refreshed in the background, so new terminals don't wait on `rpm -qa`.
+- Remote album art is downloaded once with `curl` and cached in `~/.cache/cc-dash/art`.
 
 ## Shell autorun
 
-The install script can add `termdash` to your zsh, bash or fish config so it draws in every new terminal. It asks first, or set `TERMDASH_AUTORUN`.
+The install script can add `cc-dash` to your zsh, bash or fish config so it draws in every new terminal. It asks first, or set `CC_DASH_AUTORUN`.
 
 ## Development
 

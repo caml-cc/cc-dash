@@ -1,5 +1,5 @@
 //! Everything the user can change lives here, loaded from
-//! ~/.config/termdash/config.toml. The file that gets written on first run is
+//! ~/.config/cc-dash/config.toml. The file that gets written on first run is
 //! DEFAULT_CONFIG below, and it parses into exactly the same values as the
 //! Default impls (there is a test that checks this).
 
@@ -120,7 +120,7 @@ pub struct General {
     pub title: String,
     /// Blank means PRETTY_NAME from /etc/os-release.
     pub os_name: String,
-    /// What plain `termdash` does: "once" or "live".
+    /// What plain `cc-dash` does: "once" or "live".
     pub default_mode: String,
     /// Redraw rate cap in live mode.
     pub fps: u32,
@@ -348,7 +348,7 @@ pub struct ImageCfg {
     pub cover_mode: String,
     /// "cover" crops to fill, "contain" fits the whole picture.
     pub fit: String,
-    /// Blank means the first ~/.config/termdash/logo.* file.
+    /// Blank means the first ~/.config/cc-dash/logo.* file.
     pub logo_path: String,
     /// Shown when nothing is playing, or blank for no placeholder.
     pub fallback_cover: String,
@@ -412,7 +412,7 @@ pub struct Audio {
     pub lower_cutoff_freq: u32,
     pub higher_cutoff_freq: u32,
     pub noise_reduction: u32,
-    /// 0..1 extra smoothing applied by termdash itself. 0 turns it off.
+    /// 0..1 extra smoothing applied by cc-dash itself. 0 turns it off.
     pub smooth: f32,
     pub bar_width: usize,
     pub labels: Vec<String>,
@@ -479,7 +479,7 @@ impl Default for Colors {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Text {
-    /// How much of the right-to-left work termdash does itself:
+    /// How much of the right-to-left work cc-dash does itself:
     /// "shape-and-reorder", "reorder-only", "shape-only" or "off".
     pub rtl: String,
 }
@@ -509,11 +509,11 @@ impl Config {
     pub fn dir() -> PathBuf {
         if let Ok(d) = std::env::var("XDG_CONFIG_HOME") {
             if !d.is_empty() {
-                return PathBuf::from(d).join("termdash");
+                return PathBuf::from(d).join("cc-dash");
             }
         }
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-        PathBuf::from(home).join(".config/termdash")
+        PathBuf::from(home).join(".config/cc-dash")
     }
 
     pub fn path() -> PathBuf {

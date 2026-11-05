@@ -1,8 +1,8 @@
-//! termdash - a terminal dashboard: system specs on the left, music player on
-//! the right. `termdash` draws once, `termdash --live` keeps it updating.
+//! cc-dash - a terminal dashboard: system specs on the left, music player on
+//! the right. `cc-dash` draws once, `cc-dash --live` keeps it updating.
 
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-compile_error!("termdash supports Linux and macOS only");
+compile_error!("cc-dash supports Linux and macOS only");
 
 mod audio;
 mod config;
@@ -27,10 +27,10 @@ use ui::{Dash, Placement, COVER_ID, LOGO_ID};
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const HELP: &str = "\
-termdash - terminal dashboard
+cc-dash - terminal dashboard
 
 USAGE:
-    termdash [OPTIONS]
+    cc-dash [OPTIONS]
 
 OPTIONS:
     -1, --once            Draw once and exit (good for ~/.zshrc)
@@ -46,8 +46,8 @@ OPTIONS:
     -V, --version         Show the version
 
 The config file is written on first run and every setting is documented there:
-    ~/.config/termdash/config.toml
-Put a picture at ~/.config/termdash/logo.png for the top-left corner.
+    ~/.config/cc-dash/config.toml
+Put a picture at ~/.config/cc-dash/logo.png for the top-left corner.
 ";
 
 struct Args {
@@ -88,7 +88,7 @@ fn main() {
                 return;
             }
             "-V" | "--version" => {
-                println!("termdash {}", VERSION);
+                println!("cc-dash {}", VERSION);
                 return;
             }
             "--print-config" => {
@@ -113,7 +113,7 @@ fn main() {
     let args = match parse_args(pre.general.default_mode == "live") {
         Ok(a) => a,
         Err(e) => {
-            eprintln!("termdash: {}", e);
+            eprintln!("cc-dash: {}", e);
             std::process::exit(2);
         }
     };
@@ -121,7 +121,7 @@ fn main() {
         Some(p) => match Config::load(Some(p)) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("termdash: {}", e);
+                eprintln!("cc-dash: {}", e);
                 std::process::exit(2);
             }
         },
@@ -129,7 +129,7 @@ fn main() {
             Ok(c) => c,
             Err(e) => {
                 // A broken config should not leave the user with no dashboard.
-                eprintln!("termdash: {}\ntermdash: falling back to defaults", e);
+                eprintln!("cc-dash: {}\ncc-dash: falling back to defaults", e);
                 Config::default()
             }
         },
@@ -179,7 +179,7 @@ fn debug_text(input: &str) {
         println!("  {:<18} {}", m.name(), out);
         println!("  {:<18} {}\n", "", cps(&out));
     }
-    println!("Put the one that reads correctly in ~/.config/termdash/config.toml:");
+    println!("Put the one that reads correctly in ~/.config/cc-dash/config.toml:");
     println!("    [text]");
     println!("    rtl = \"<that name>\"");
     println!();
@@ -632,7 +632,7 @@ mod tests {
 
     #[test]
     fn args_parse() {
-        // default_mode decides what plain `termdash` does
+        // default_mode decides what plain `cc-dash` does
         assert!(!parse_args(false).unwrap().live || true);
     }
 

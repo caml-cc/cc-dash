@@ -53,7 +53,7 @@ pub fn cava_config_text(cfg: &Audio) -> String {
     let method = if mac && cfg.method == "pulse" { "coreaudio" } else { &cfg.method };
     let source = if mac && method == "coreaudio" && cfg.source == "auto" { "tap" } else { &cfg.source };
     format!(
-        "# Written by termdash. Edit [audio] in config.toml instead; this file is\n\
+        "# Written by cc-dash. Edit [audio] in config.toml instead; this file is\n\
          # regenerated whenever those settings change.\n\
          [general]\n\
          bars = 3\n\

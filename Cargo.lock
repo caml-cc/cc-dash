@@ -220,6 +220,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "cc-dash"
+version = "4.3.0"
+dependencies = [
+ "ar-reshaper",
+ "base64",
+ "chrono",
+ "chrono-tz",
+ "image",
+ "libc",
+ "serde",
+ "toml",
+ "unicode-bidi",
+ "unicode-width",
+ "zbus",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -893,23 +910,6 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys",
-]
-
-[[package]]
-name = "termdash"
-version = "4.3.0"
-dependencies = [
- "ar-reshaper",
- "base64",
- "chrono",
- "chrono-tz",
- "image",
- "libc",
- "serde",
- "toml",
- "unicode-bidi",
- "unicode-width",
- "zbus",
 ]
 
 [[package]]
