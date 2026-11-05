@@ -132,17 +132,18 @@ Arabic, Hebrew and other right-to-left titles are shaped and reordered before th
 cc-dash --debug-text "مرحبا بالعالم"
 ```
 
-It prints the text four ways. Put the one that reads correctly in the config:
+It prints the text every way cc-dash can. Put the one that reads correctly in the config:
 
 ```toml
 [text]
 rtl = "shape-and-reorder" # the default
 # rtl = "reorder-only" # for a terminal that shapes Arabic itself
 # rtl = "shape-only" # for a terminal that reorders but does not shape
+# rtl = "word-order" # for a terminal that draws each word right but puts the words in the wrong order (kitty)
 # rtl = "off" # sends the text exactly as it arrived
 ```
 
-If all four show boxes, your font is missing the Arabic Presentation Forms (U+FE70–U+FEFF).
+If they all show boxes, your font is missing the Arabic Presentation Forms (U+FE70–U+FEFF).
 
 ### Caching
 

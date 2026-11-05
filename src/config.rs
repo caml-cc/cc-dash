@@ -480,7 +480,7 @@ impl Default for Colors {
 #[serde(default, deny_unknown_fields)]
 pub struct Text {
     /// How much of the right-to-left work cc-dash does itself:
-    /// "shape-and-reorder", "reorder-only", "shape-only" or "off".
+    /// "shape-and-reorder", "reorder-only", "shape-only", "word-order" or "off".
     pub rtl: String,
 }
 
